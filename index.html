@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三消游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .game-container {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        .game-title { font-size: 2rem; color: #667eea; }
+        .level-info { font-size: 1.2rem; color: #764ba2; margin-top: 10px; }
+        .score-panel {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            color: white;
+        }
+        .score-box { text-align: center; }
+        .score-label { font-size: 0.9rem; opacity: 0.9; }
+        .score-value { font-size: 1.5rem; font-weight: bold; }
+        .game-area { display: flex; gap: 20px; margin-bottom: 20px; }
+        .card-area {
+            flex: 2;
+            min-height: 400px;
+            background: #f5f7fa;
+            border-radius: 15px;
+            padding: 20px;
+            position: relative;
+        }
+        .slot-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            background: #667eea;
+            border-radius: 15px;
+        }
+        .slot {
+            flex: 1;
+            background: rgba(255,255,255,0.3);
+            border: 3px dashed rgba(255,255,255,0.5);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .card {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .card:hover { transform: scale(1.1); }
+        .card.disabled { opacity: 0.5; pointer-events: none; }
+        .card.in-slot {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            font-size: 2rem;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            font-size: 1rem;
+        }
+        .btn-primary { background: #667eea; }
+        .btn-secondary { background: #11998e; }
+        .btn:hover { opacity: 0.9; }
+        .tips {
+            text-align: center;
+            margin-top: 20px;
+            color: #667eea;
+            font-size: 0.9rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+        }
+        .level-complete-modal .modal-content { max-width: 600px; }
+        #levelCompleteImage {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1 class="game-title">🎯 三消游戏</h1>
+            <div class="level-info" id="levelDisplay">第 1 关</div>
+        </div>
+        
+        <div class="score-panel">
+            <div class="score-box">
+                <span class="score-label">最高分</span>
+                <span class="score-value" id="highScore">0</span>
+            </div>
+            <div class="score-box">
+                <span class="score-label">当前分</span>
+                <span class="score-value" id="currentScore">0</span>
+            </div>
+            <div class="score-box">
+                <span class="score-label">连击</span>
+                <span class="score-value" id="combo">0</span>
+            </div>
+        </div>
+        
+        <div class="game-area">
+            <div class="card-area" id="cardArea"></div>
+            <div class="slot-area" id="slotArea">
+                <div class="slot" data-index="0"></div>
+                <div class="slot" data-index="1"></div>
+                <div class="slot" data-index="2"></div>
+                <div class="slot" data-index="3"></div>
+                <div class="slot" data-index="4"></div>
+                <div class="slot" data-index="5"></div>
+                <div class="slot" data-index="6"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="game.startNewGame()">🔄 重新开始</button>
+        </div>
+        
+        <div class="tips">
+            <p>💡 点击卡片移动到槽位，3张相同卡片自动消除</p>
+        </div>
+    </div>
+    
+    <div class="modal" id="levelCompleteModal">
+        <div class="modal-content level-complete-modal">
+            <img src="files/1.png" alt="通关" id="levelCompleteImage" style="display:none;">
+            <h2 id="levelCompleteText">🎉 通关成功!</h2>
+        </div>
+    </div>
+
+    <script>
+        // 简化版游戏 - 所有代码内联
+        console.log('开始加载游戏...');
+        
+        class Card {
+            constructor(id, type, x, y, layer) {
+                this.id = id;
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.layer = layer;
+                this.element = null;
+                this.isDisabled = false;
+                this.inSlot = false;
+            }
+            
+            getIcon() {
+                const icons = ['🐵', '🦁', '🐯', '🐨', '🦊', '🐀', '🐭'];
+                return icons[this.type];
+            }
+            
+            createElement() {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.dataset.id = this.id;
+                el.dataset.type = this.type;
+                el.innerHTML = this.getIcon();
+                el.style.left = this.x + 'px';
+                el.style.top = this.y + 'px';
+                el.style.zIndex = this.layer;
+                el.onclick = () => {
+                    if (!this.isDisabled && game.isPlaying) {
+                        game.handleCardClick(this);
+                    }
+                };
+                this.element = el;
+                return el;
+            }
+            
+            enable() { this.isDisabled = false; if(this.element) this.element.classList.remove('disabled'); }
+            disable() { this.isDisabled = true; if(this.element) this.element.classList.add('disabled'); }
+            destroy() { if(this.element) this.element.remove(); this.inSlot = false; }
+        }
+        
+        class Game {
+            constructor() {
+                this.cards = new Map();
+                this.nextId = 0;
+                this.slots = new Array(7).fill(null);
+                this.currentScore = 0;
+                this.highScore = 0;
+                this.combo = 0;
+                this.level = 1;
+                this.isPlaying = false;
+                this.cardArea = document.getElementById('cardArea');
+                this.slotElements = document.querySelectorAll('.slot');
+                
+                this.loadHighScore();
+                this.init();
+            }
+            
+            loadHighScore() {
+                try {
+                    const saved = localStorage.getItem('tileHighScore');
+                    if (saved) this.highScore = parseInt(saved);
+                } catch(e) {}
+                document.getElementById('highScore').textContent = this.highScore;
+            }
+            
+            saveHighScore() {
+                try {
+                    localStorage.setItem('tileHighScore', this.highScore.toString());
+                } catch(e) {}
+            }
+            
+            updateUI() {
+                document.getElementById('currentScore').textContent = this.currentScore;
+                document.getElementById('highScore').textContent = this.highScore;
+                document.getElementById('combo').textContent = this.combo;
+                document.getElementById('levelDisplay').textContent = '第 ' + this.level + ' 关';
+            }
+            
+            createCard(type, x, y, layer) {
+                const card = new Card(this.nextId++, type, x, y, layer);
+                this.cards.set(card.id, card);
+                return card;
+            }
+            
+            init() {
+                this.startNewGame();
+            }
+            
+            startNewGame() {
+                this.level = 1;
+                this.currentScore = 0;
+                this.combo = 0;
+                this.isPlaying = true;
+                this.cards.clear();
+                this.nextId = 0;
+                this.slots.fill(null);
+                this.updateSlotUI();
+                this.generateLevel();
+                this.updateUI();
+            }
+            
+            getLevelConfig() {
+                // 根据关卡返回配置
+                const config = {
+                    cardTypes: Math.min(7, 4 + Math.floor(this.level / 2)),  // 4-7种类型
+                    groupsPerType: Math.min(6, 3 + Math.floor(this.level / 3)), // 3-6组
+                    layers: Math.min(5, 2 + Math.floor(this.level / 2))        // 2-5层
+                };
+                return config;
+            }
+            
+            generateLevel() {
+                this.cardArea.innerHTML = '';
+                this.cards.clear();
+                this.nextId = 0;
+                this.slots.fill(null);
+                
+                const config = this.getLevelConfig();
+                
+                console.log(`第${this.level}关: ${config.cardTypes}种类型, ${config.groupsPerType}组/种, ${config.layers}层`);
+                
+                // 生成卡片类型
+                const cardTypes = [];
+                for (let type = 0; type < config.cardTypes; type++) {
+                    for (let g = 0; g < config.groupsPerType; g++) {
+                        cardTypes.push(type, type, type);
+                    }
+                }
+                
+                // 随机打乱
+                for (let i = cardTypes.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [cardTypes[i], cardTypes[j]] = [cardTypes[j], cardTypes[i]];
+                }
+                
+                console.log('生成卡片: ' + cardTypes.length + '张');
+                
+                // 计算位置
+                const areaWidth = this.cardArea.offsetWidth || 500;
+                const areaHeight = this.cardArea.offsetHeight || 400;
+                const cardSize = 70;
+                const gap = 10;
+                
+                const cols = Math.floor((areaWidth - 40) / (cardSize + gap));
+                const rows = Math.floor((areaHeight - 40) / (cardSize + gap));
+                
+                // 多层堆叠
+                for (let layer = 0; layer < config.layers; layer++) {
+                    const cardsInLayer = Math.ceil(cardTypes.length / config.layers);
+                    const layerOffset = layer * 2;
+                    const layerCols = Math.max(3, cols - layerOffset);
+                    const layerRows = Math.max(3, rows - layerOffset);
+                    
+                    const layerStartX = (areaWidth - layerCols * (cardSize + gap)) / 2;
+                    const layerStartY = (areaHeight - layerRows * (cardSize + gap)) / 2;
+                    
+                    for (let i = 0; i < cardsInLayer; i++) {
+                        const index = layer * cardsInLayer + i;
+                        if (index >= cardTypes.length) break;
+                        
+                        const col = Math.floor(Math.random() * layerCols);
+                        const row = Math.floor(Math.random() * layerRows);
+                        
+                        const x = layerStartX + col * (cardSize + gap);
+                        const y = layerStartY + row * (cardSize + gap);
+                        
+                        const card = this.createCard(cardTypes[index], x, y, layer);
+                        this.cardArea.appendChild(card.createElement());
+                    }
+                }
+                
+                this.updateCardStates();
+                console.log('卡片生成完成: ' + this.cards.size + '张');
+            }
+            
+            updateCardStates() {
+                const cards = Array.from(this.cards.values()).filter(c => !c.inSlot);
+                cards.sort((a, b) => a.layer - b.layer);
+                
+                cards.forEach(card => {
+                    let covered = false;
+                    for (const other of cards) {
+                        if (other.layer <= card.layer || other.inSlot) continue;
+                        if (this.checkOverlap(card, other)) {
+                            covered = true;
+                            break;
+                        }
+                    }
+                    if (covered) card.disable();
+                    else card.enable();
+                });
+            }
+            
+            checkOverlap(c1, c2) {
+                const size = 70;
+                return !(c1.x + size <= c2.x || c1.x >= c2.x + size ||
+                        c1.y + size <= c2.y || c1.y >= c2.y + size);
+            }
+            
+            handleCardClick(card) {
+                const emptyIndex = this.slots.findIndex(s => s === null);
+                if (emptyIndex === -1) return;
+                
+                this.slots[emptyIndex] = { id: card.id, type: card.type, card: card };
+                card.inSlot = true;
+                if (card.element) card.element.remove();
+                
+                this.updateSlotUI();
+                this.checkElimination();
+                this.updateCardStates();
+                
+                if (this.slots.filter(s => s !== null).length === 7) {
+                    const canEliminate = this.canEliminate();
+                    if (!canEliminate) {
+                        alert('槽位已满，游戏结束！得分: ' + this.currentScore);
+                        this.isPlaying = false;
+                    }
+                }
+            }
+            
+            updateSlotUI() {
+                this.slotElements.forEach((el, idx) => {
+                    el.innerHTML = '';
+                    const slot = this.slots[idx];
+                    if (slot && slot.card) {
+                        const cardEl = document.createElement('div');
+                        cardEl.className = 'card in-slot';
+                        cardEl.innerHTML = slot.card.getIcon();
+                        el.appendChild(cardEl);
+                    }
+                });
+            }
+            
+            checkElimination() {
+                const counts = {};
+                this.slots.forEach((s, idx) => {
+                    if (s) {
+                        counts[s.type] = counts[s.type] || [];
+                        counts[s.type].push(idx);
+                    }
+                });
+                
+                for (const type in counts) {
+                    if (counts[type].length >= 3) {
+                        const indices = counts[type].slice(0, 3);
+                        
+                        // 增加分数
+                        this.combo++;
+                        const points = 30 + this.combo * 20;
+                        this.currentScore += points;
+                        
+                        if (this.currentScore > this.highScore) {
+                            this.highScore = this.currentScore;
+                            this.saveHighScore();
+                        }
+                        
+                        // 移除卡片
+                        indices.forEach(idx => {
+                            const slot = this.slots[idx];
+                            if (slot) {
+                                slot.card.destroy();
+                                this.cards.delete(slot.id);
+                                this.slots[idx] = null;
+                            }
+                        });
+                        
+                        // 紧凑槽位
+                        const nonNull = this.slots.filter(s => s !== null);
+                        this.slots.fill(null);
+                        nonNull.forEach((s, i) => this.slots[i] = s);
+                        
+                        this.updateSlotUI();
+                        this.updateCardStates();
+                        this.updateUI();
+                        
+                        // 检查胜利
+                        if (this.cards.size === 0) {
+                            this.levelComplete();
+                        }
+                        
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            canEliminate() {
+                const counts = {};
+                this.slots.forEach(s => {
+                    if (s) counts[s.type] = (counts[s.type] || 0) + 1;
+                });
+                for (const type in counts) {
+                    if (counts[type] >= 3) return true;
+                }
+                return false;
+            }
+            
+            levelComplete() {
+                console.log('关卡完成！');
+                this.isPlaying = false;
+                
+                // 显示通关图片
+                const modal = document.getElementById('levelCompleteModal');
+                const img = document.getElementById('levelCompleteImage');
+                const text = document.getElementById('levelCompleteText');
+                
+                // 先显示文字
+                img.style.display = 'none';
+                text.textContent = '🎉 第' + this.level + '关通过!';
+                modal.classList.add('show');
+                
+                // 所有关卡统一使用 1.png
+                const imgPath = 'files/1.png';
+                const testImg = new Image();
+                
+                testImg.onload = () => {
+                    console.log('图片加载成功: ' + imgPath);
+                    img.src = imgPath;
+                    img.style.display = 'block';
+                    text.textContent = '🎉 通关成功!';
+                };
+                
+                testImg.onerror = () => {
+                    console.log('图片加载失败: ' + imgPath);
+                    img.style.display = 'none';
+                    text.textContent = '🎉 第' + this.level + '关通过!';
+                };
+                
+                testImg.src = imgPath;
+                
+                // 1.5秒后下一关
+                setTimeout(() => {
+                    modal.classList.remove('show');
+                    this.nextLevel();
+                }, 1500);
+            }
+            
+            nextLevel() {
+                this.level++;
+                this.isPlaying = true;
+                this.combo = 0;
+                this.slots.fill(null);
+                this.updateSlotUI();
+                this.generateLevel();
+                this.updateUI();
+            }
+        }
+        
+        // 启动游戏
+        let game;
+        window.onload = function() {
+            console.log('DOM加载完成');
+            try {
+                game = new Game();
+                console.log('游戏初始化成功');
+            } catch(e) {
+                console.error('游戏初始化失败:', e);
+                alert('游戏加载失败: ' + e.message);
+            }
+        };
+    </script>
+</body>
+</html>
